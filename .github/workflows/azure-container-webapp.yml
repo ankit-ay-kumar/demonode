@@ -24,7 +24,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          IMAGE=${{ secrets.ACR_LOGIN_SERVER }}/my-node-app:${{ github.sha }}
+          IMAGE=${{ secrets.ACR_LOGIN_SERVER }}/my-node-app:11${{ github.sha }}
           docker build -t $IMAGE .
           docker push $IMAGE
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
