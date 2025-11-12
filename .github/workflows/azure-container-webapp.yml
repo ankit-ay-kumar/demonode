@@ -3,7 +3,7 @@ name: Build and Deploy to Azure WebApp (Docker)
 on:
   push:
     branches:
-      - master # trigger when pushing to master branch
+      - master
 
 permissions:
   id-token: write
@@ -14,54 +14,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo
+      # 1️⃣ Checkout repo
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug AZURE_CREDENTIALS
-        run: |
-          echo "CLIENT ID: $(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.clientId' | cut -c1-5)*****"
-          echo "TENANT ID: $(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.tenantId' | cut -c1-5)*****"
-          echo "Parsing credentials JSON succeeded."
-        shell: bash
-
-      # 2. Log in to Azure
-      # - name: Azure Login
-      #   uses: azure/login@v2
-      #   with:
-      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      # # 2. Log in to Azure
+      # 2️⃣ Login to Azure using service principal
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: "8fce3dd1-3400-4583-8e2a-ef92e7a224f0"
-          client-secret: ""
-          tenant-id: "993b403e-9e97-49b5-81f2-d3cc33022fc7"
-          subscription-id: "02f87cad-8a31-458a-9cd7-d79a97d6c532"
-          auth-type: "SERVICE_PRINCIPAL"
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
-      # 3. Log in to ACR
-      - name: Docker login to ACR
-        run: |
-          echo ${{ secrets.REGISTRY_PASSWORD }} | docker login ${{ secrets.REGISTRY_LOGIN_SERVER }} \
-            --username ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+      # 3️⃣ Log in to Azure Container Registry (ACR)
+      - name: Login to ACR
+        uses: azure/docker-login@v2
+        with:
+          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      # 4. Build Docker image
+      # 4️⃣ Build and tag the Docker image
       - name: Build Docker image
         run: |
           docker build -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-node-app:${{ github.sha }} .
-          docker tag ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-node-app:${{ github.sha }} ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-node-app:latest
+          docker tag ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-node-app:${{ github.sha }} \
+                     ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-node-app:latest
 
-      # 5. Push Docker image
+      # 5️⃣ Push the Docker image to ACR
       - name: Push Docker image
         run: |
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-node-app:${{ github.sha }}
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/my-node-app:latest
 
-      # 6. Deploy to Azure WebApp
-      - name: Deploy to Azure WebApp
+      # 6️⃣ Deploy image to Azure Web App for Containers
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: "myNodeWebApp" # <-- Replace with your WebApp name
-          images: "${{ secrets.REGISTRY_LOGIN_SERVER }}/my-node-app:${{ github.sha }}"
+          app-name: "myNodeWebApp" # your web app name
+          images: "${{ secrets.REGISTRY_LOGIN_SERVER }}/my-node-app:latest"
